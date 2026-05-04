@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>あなたの成績 | ニュース読んでる？</title>
+  <link rel="stylesheet" href="css/base.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .stats-wrapper {
+      position: relative;
+      z-index: 1;
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 24px 16px 60px;
+    }
+
+    .page-title {
+      text-align: center;
+      font-family: var(--font-pixel);
+      font-size: 1rem;
+      color: var(--color-accent);
+      margin-bottom: 28px;
+    }
+
+    /* ── サマリーカード ── */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .summary-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: 18px 14px;
+      text-align: center;
+    }
+
+    .summary-card .label {
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.45);
+      margin-bottom: 6px;
+    }
+
+    .summary-card .value {
+      font-family: var(--font-pixel);
+      font-size: 1.3rem;
+      color: var(--color-accent);
+    }
+
+    .summary-card .sub {
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.35);
+      margin-top: 4px;
+    }
+
+    .summary-card.wide {
+      grid-column: 1 / -1;
+    }
+
+    /* ── ランクプログレス ── */
+    .rank-section {
+      margin-bottom: 28px;
+    }
+
+    .rank-current {
+      text-align: center;
+      margin-bottom: 12px;
+    }
+
+    .rank-current .rank-name {
+      font-family: var(--font-pixel);
+      font-size: 1rem;
+      color: var(--color-accent);
+    }
+
+    .rank-current .rank-chapter {
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.4);
+      margin-top: 4px;
+    }
+
+    .rank-progress-bar-wrap {
+      margin-top: 12px;
+    }
+
+    .rank-progress-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.4);
+      margin-bottom: 4px;
+    }
+
+    .rank-progress-track {
+      height: 8px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .rank-progress-fill {
+      height: 100%;
+      background: linear-gradient(to right, #a06020, var(--color-accent));
+      border-radius: 4px;
+      transition: width 0.8s ease;
+    }
+
+    .rank-progress-pts {
+      text-align: center;
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.35);
+      margin-top: 6px;
+    }
+
+    /* ── セクションタイトル ── */
+    .section-title {
+      font-family: var(--font-pixel);
+      font-size: 0.8rem;
+      color: var(--color-accent);
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    /* ── カテゴリ別分析 ── */
+    .cat-analysis {
+      margin-bottom: 28px;
+    }
+
+    .cat-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .cat-row .cat-name {
+      width: 40px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .cat-row .cat-track {
+      flex: 1;
+      height: 18px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .cat-row .cat-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.8s ease-out 0.2s;
+    }
+
+    .cat-row .cat-pct {
+      width: 40px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.6);
+      flex-shrink: 0;
+    }
+
+    /* ── 週別スコア推移 ── */
+    .history-section {
+      margin-bottom: 28px;
+    }
+
+    .history-table {
+      width: 100%;
+    }
+
+    .history-table th {
+      font-size: 0.7rem;
+    }
+
+    .history-table td {
+      font-size: 0.85rem;
+    }
+
+    .history-table .score-cell {
+      font-family: var(--font-pixel);
+      font-size: 0.75rem;
+      color: var(--color-accent);
+    }
+
+    /* ── レスポンシブ ── */
+    @media (max-width: 480px) {
+      .summary-grid { gap: 8px; }
+      .summary-card .value { font-size: 1.1rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="stats-wrapper">
+    <h1 class="page-title">あなたの成績</h1>
+
+    <!-- サマリー -->
+    <div class="summary-grid" id="summaryGrid">
+      <div class="summary-card">
+        <div class="label">今週のスコア</div>
+        <div class="value" id="weekScore">-</div>
+        <div class="sub" id="weekTime"></div>
+      </div>
+      <div class="summary-card">
+        <div class="label">累計参加回数</div>
+        <div class="value" id="totalParticipations">0</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">平均正答率</div>
+        <div class="value" id="avgRate">0%</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">ランクスコア</div>
+        <div class="value" id="rankScore">0</div>
+      </div>
+    </div>
+
+    <!-- ランクプログレス -->
+    <div class="rank-section">
+      <div class="rank-current">
+        <div class="rank-name" id="rankName">-</div>
+        <div class="rank-chapter" id="rankChapter"></div>
+      </div>
+      <div class="rank-progress-bar-wrap">
+        <div class="rank-progress-labels">
+          <span id="currentLabel">-</span>
+          <span id="nextLabel">-</span>
+        </div>
+        <div class="rank-progress-track">
+          <div class="rank-progress-fill" id="progressFill" style="width:0%"></div>
+        </div>
+        <div class="rank-progress-pts" id="progressPts"></div>
+      </div>
+    </div>
+
+    <!-- カテゴリ別分析 -->
+    <div class="cat-analysis">
+      <h2 class="section-title">カテゴリ別得意・不得意</h2>
+      <div id="catBars"></div>
+    </div>
+
+    <!-- 週別推移 -->
+    <div class="history-section">
+      <h2 class="section-title">週別スコア推移</h2>
+      <table class="history-table" id="historyTable">
+        <thead>
+          <tr><th>週</th><th>スコア</th><th>政治</th><th>経済</th><th>国際</th><th>時間</th></tr>
+        </thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+      <div id="historyEmpty" class="hidden" style="text-align:center; font-size:0.85rem; color:rgba(255,255,255,0.4); padding:24px;">まだ受験履歴がありません。</div>
+    </div>
+
+    <div style="text-align:center; margin-top:24px;">
+      <a href="home.html" class="btn btn--accent">ホームに戻る</a>
+    </div>
+  </div>
+
+  <script src="js/config.js" onerror="console.warn('config.js not found')"></script>
+  <script>
+    if (typeof _supabase === 'undefined') {
+      document.body.innerHTML = '<div style="text-align:center;padding:60px 20px;font-family:sans-serif;color:#f0c040"><h2>設定ファイルが見つかりません</h2><p style="color:#aaa;margin-top:12px">js/config.js を作成してください。<br>テンプレート: js/config.example.js</p></div>';
+      throw new Error('config.js is missing');
+    }
+  </script>
+  <script src="js/auth.js"></script>
+  <script src="js/rank-system.js"></script>
+  <script>
+    const CHAPTER_NAMES = ['', '第1章 学び舎', '第2章 霞が関', '第3章 権力の回廊', '第4章 国会議事堂', '第5章 総理官邸'];
+
+    (async function init() {
+      const user = await requireAuth();
+      if (!user) return;
+
+      // ユーザー基本情報
+      const rank = getRankById(user.rank_id || 1);
+      document.getElementById('rankName').textContent = rank.name;
+      document.getElementById('rankChapter').textContent = CHAPTER_NAMES[rank.chapter] || '';
+      document.getElementById('totalParticipations').textContent = user.total_participations || 0;
+      document.getElementById('rankScore').textContent = Math.floor(user.rank_score || 0);
+
+      // 全スコア取得
+      const { data: scores } = await _supabase
+        .from('weekly_scores')
+        .select('*, quiz_sets(week_id)')
+        .eq('user_id', user.id)
+        .order('completed_at', { ascending: false });
+
+      if (!scores || scores.length === 0) {
+        document.getElementById('weekScore').textContent = '-';
+        document.getElementById('avgRate').textContent = '0%';
+        document.getElementById('historyEmpty').classList.remove('hidden');
+        document.getElementById('historyTable').classList.add('hidden');
+        renderCatBars(0, 0, 0, 0, 0, 0);
+        renderProgress(rank, user.rank_score || 0);
+        return;
+      }
+
+      // 今週のスコア
+      const latest = scores[0];
+      document.getElementById('weekScore').textContent = `${latest.total_score}/10`;
+      if (latest.time_taken != null) {
+        const m = Math.floor(latest.time_taken / 60);
+        const s = String(latest.time_taken % 60).padStart(2, '0');
+        document.getElementById('weekTime').textContent = `所要時間 ${m}:${s}`;
+      }
+
+      // 平均正答率
+      const totalCorrect = scores.reduce((s, r) => s + r.total_score, 0);
+      const totalQ = scores.length * 10;
+      const avgPct = totalQ > 0 ? Math.round((totalCorrect / totalQ) * 100) : 0;
+      document.getElementById('avgRate').textContent = avgPct + '%';
+
+      // カテゴリ合計
+      let polTotal = 0, ecoTotal = 0, intTotal = 0;
+      scores.forEach(s => {
+        polTotal += s.politics_score || 0;
+        ecoTotal += s.economy_score || 0;
+        intTotal += s.international_score || 0;
+      });
+      const polMax = scores.length * 4;
+      const ecoMax = scores.length * 3;
+      const intMax = scores.length * 3;
+      renderCatBars(polTotal, polMax, ecoTotal, ecoMax, intTotal, intMax);
+
+      // 週別推移
+      const tbody = document.getElementById('historyBody');
+      scores.forEach(s => {
+        const weekId = s.quiz_sets?.week_id || '-';
+        const time = s.time_taken != null
+          ? `${Math.floor(s.time_taken / 60)}:${String(s.time_taken % 60).padStart(2, '0')}`
+          : '-';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${weekId}</td>
+          <td class="score-cell">${s.total_score}/10</td>
+          <td>${s.politics_score || 0}/4</td>
+          <td>${s.economy_score || 0}/3</td>
+          <td>${s.international_score || 0}/3</td>
+          <td>${time}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // ランクプログレス
+      renderProgress(rank, user.rank_score || 0);
+    })();
+
+    function renderCatBars(pol, polMax, eco, ecoMax, intl, intMax) {
+      const cats = [
+        { name: '政治', correct: pol, max: polMax, color: '#6688ff' },
+        { name: '経済', correct: eco, max: ecoMax, color: '#66ffcc' },
+        { name: '国際', correct: intl, max: intMax, color: '#cc66ff' },
+      ];
+      const container = document.getElementById('catBars');
+      container.innerHTML = cats.map(c => {
+        const pct = c.max > 0 ? Math.round((c.correct / c.max) * 100) : 0;
+        return `
+          <div class="cat-row">
+            <span class="cat-name" style="color:${c.color}">${c.name}</span>
+            <div class="cat-track"><div class="cat-fill" style="width:${pct}%;background:${c.color}"></div></div>
+            <span class="cat-pct">${pct}%</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderProgress(rank, score) {
+      const next = getRankById(rank.id + 1);
+      if (next && next.id !== rank.id) {
+        const pct = Math.min(100, Math.max(0, ((score - rank.min) / (next.min - rank.min)) * 100));
+        document.getElementById('progressFill').style.width = pct.toFixed(1) + '%';
+        document.getElementById('currentLabel').textContent = rank.name;
+        document.getElementById('nextLabel').textContent = next.name;
+        document.getElementById('progressPts').textContent = `あと ${Math.max(0, Math.floor(next.min - score))} ポイントで昇格`;
+      } else {
+        document.getElementById('progressFill').style.width = '100%';
+        document.getElementById('currentLabel').textContent = rank.name;
+        document.getElementById('nextLabel').textContent = '最高位';
+        document.getElementById('progressPts').textContent = '最高位に到達しました！';
+      }
+    }
+  </script>
+</body>
+</html>
