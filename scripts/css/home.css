@@ -1,0 +1,427 @@
+/* ── ホーム画面レイアウト ── */
+.home-wrapper {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: 16px 16px 40px;
+}
+
+/* ── 新クイズ公開バナー ── */
+.new-quiz-banner {
+  width: 100%;
+  max-width: 600px;
+  background: linear-gradient(90deg, rgba(0,200,80,0.15), rgba(0,200,80,0.08));
+  border: 1px solid rgba(0,255,80,0.4);
+  border-radius: 6px;
+  padding: 12px 20px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #66ff99;
+  animation: banner-glow 2s ease-in-out infinite;
+}
+
+.new-quiz-banner .banner-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #00ff66;
+  flex-shrink: 0;
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+@keyframes banner-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(0,255,80,0.2); }
+  50%       { box-shadow: 0 0 16px rgba(0,255,80,0.4); }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.8); }
+}
+
+/* ── ランク表示エリア ── */
+.rank-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.rank-title {
+  font-family: var(--font-pixel);
+  font-size: 1.1rem;
+  color: var(--color-accent);
+  text-shadow: 0 0 16px rgba(240,192,64,0.4);
+  line-height: 1.8;
+  margin-bottom: 4px;
+}
+
+.rank-chapter {
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+.rank-score-line {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.35);
+  margin-top: 4px;
+}
+
+/* ── アバターエリア ── */
+.avatar-area {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin-bottom: 32px;
+}
+
+/* ── CSSドット絵アバター（5章共通ベース） ── */
+.avatar {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 頭部 */
+.avatar .head {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  background: #f5c5a0;
+  border: 2px solid #1a1a1a;
+}
+
+/* 目 */
+.avatar .head::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 6px;
+  width: 6px;
+  height: 6px;
+  background: #1a1a1a;
+  border-radius: 1px;
+  box-shadow: 14px 0 0 #1a1a1a;
+}
+
+/* 胴体 */
+.avatar .body {
+  position: absolute;
+  top: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 48px;
+  border-radius: 3px;
+  border: 2px solid #1a1a1a;
+}
+
+/* 足 */
+.avatar .body::after {
+  content: '';
+  position: absolute;
+  bottom: -18px;
+  left: 4px;
+  width: 12px;
+  height: 16px;
+  background: inherit;
+  border: 2px solid #1a1a1a;
+  border-radius: 1px;
+  box-shadow: 14px 0 0 #1a1a1a, 14px 0 0 0 2px #1a1a1a;
+}
+
+/* ── 章別アバターカラー ── */
+
+/* 第1章（学生）：制服 紺 */
+body.chapter-1 .avatar .body {
+  background: #1a2a5c;
+}
+
+body.chapter-1 .avatar .head {
+  background: #f0c090;
+}
+
+/* 第2章（事務官）：グレースーツ */
+body.chapter-2 .avatar .body {
+  background: #505060;
+}
+
+body.chapter-2 .avatar .body::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 16px;
+  background: #8090a0;
+  border-radius: 1px;
+}
+
+/* 第3章（官僚）：ダークスーツ + 金バッジ */
+body.chapter-3 .avatar .body {
+  background: #1a1e2e;
+}
+
+body.chapter-3 .avatar .body::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  background: var(--color-accent);
+  border-radius: 50%;
+}
+
+/* 第4章（議員）：スーツ + 赤バッジ */
+body.chapter-4 .avatar .body {
+  background: #1e1010;
+  border-color: #cc2020;
+}
+
+body.chapter-4 .avatar .body::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: 6px;
+  width: 10px;
+  height: 6px;
+  background: #cc2020;
+  border-radius: 1px;
+}
+
+/* 第5章（総理）：黒スーツ + 最大ゴールド */
+body.chapter-5 .avatar .body {
+  background: #0a0a0a;
+  border-color: var(--color-accent);
+}
+
+body.chapter-5 .avatar .body::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8px;
+  height: 22px;
+  background: linear-gradient(to bottom, var(--color-accent), #a08020);
+  border-radius: 1px;
+}
+
+/* アバター台座 */
+.avatar-pedestal {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 6px;
+  background: rgba(240,192,64,0.2);
+  border-radius: 3px;
+}
+
+/* アバターの光輪（第3章以上） */
+body.chapter-3 .avatar::before,
+body.chapter-4 .avatar::before,
+body.chapter-5 .avatar::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 4px;
+  background: radial-gradient(ellipse at center, rgba(240,192,64,0.1) 0%, transparent 70%);
+  animation: avatar-glow 3s ease-in-out infinite;
+}
+
+@keyframes avatar-glow {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 1; }
+}
+
+/* ── 4ボタングリッド ── */
+.home-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  width: 100%;
+  max-width: 480px;
+}
+
+.home-grid-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 22px 12px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(240,192,64,0.25);
+  border-radius: 8px;
+  color: var(--color-text);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 700;
+  transition: background 0.2s, border-color 0.2s, transform 0.1s, box-shadow 0.2s;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.home-grid-btn:hover {
+  background: rgba(240,192,64,0.1);
+  border-color: rgba(240,192,64,0.6);
+  box-shadow: 0 0 16px rgba(240,192,64,0.15);
+  transform: translateY(-2px);
+}
+
+.home-grid-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* 最新クイズボタン：アクセントカラー */
+.home-grid-btn.btn-quiz {
+  border-color: rgba(240,192,64,0.6);
+  background: rgba(240,192,64,0.08);
+}
+
+.home-grid-btn.btn-quiz:hover {
+  background: rgba(240,192,64,0.16);
+}
+
+/* 受験済みのグレーアウト */
+.home-grid-btn.btn-quiz.done {
+  opacity: 0.5;
+  cursor: default;
+  pointer-events: none;
+}
+
+.home-grid-btn .btn-icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.home-grid-btn .btn-label {
+  font-size: 0.82rem;
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* 「クイズに挑戦」のみ太字ゴールド */
+.home-grid-btn.btn-quiz .btn-label {
+  color: var(--color-accent);
+}
+
+/* 受験済みバッジ */
+.done-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 0.65rem;
+  background: rgba(0,200,80,0.2);
+  color: #66ff99;
+  border: 1px solid rgba(0,200,80,0.4);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-weight: 700;
+}
+
+/* ── ランクプログレスバー ── */
+.rank-progress {
+  width: 100%;
+  max-width: 480px;
+  margin-top: 28px;
+}
+
+.rank-progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.45);
+  margin-bottom: 6px;
+}
+
+.rank-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.rank-progress-fill {
+  height: 100%;
+  background: linear-gradient(to right, #a06020, var(--color-accent));
+  border-radius: 3px;
+  transition: width 0.8s ease;
+}
+
+/* ── ユーザー名・ログアウト ── */
+.user-bar {
+  position: fixed;
+  top: 12px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 200;
+}
+
+.user-name {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.5);
+}
+
+.logout-btn {
+  font-size: 0.7rem;
+  padding: 5px 10px;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 3px;
+  color: rgba(255,255,255,0.4);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.logout-btn:hover {
+  border-color: rgba(255,80,80,0.5);
+  color: #ff8080;
+}
+
+/* ── 管理者リンク ── */
+.admin-link {
+  position: fixed;
+  bottom: 14px;
+  right: 14px;
+  font-size: 0.7rem;
+  color: rgba(240,192,64,0.3);
+  text-decoration: none;
+  z-index: 200;
+  transition: color 0.2s;
+}
+
+.admin-link:hover {
+  color: rgba(240,192,64,0.8);
+}
+
+/* ── レスポンシブ ── */
+@media (max-width: 480px) {
+  .rank-title { font-size: 0.9rem; }
+  .home-grid { gap: 10px; }
+  .home-grid-btn { padding: 18px 8px; }
+  .home-grid-btn .btn-icon { font-size: 1.6rem; }
+  .home-grid-btn .btn-label { font-size: 0.75rem; }
+}
