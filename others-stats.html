@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>みんなの成績 | ニュース読んでる？</title>
+  <link rel="stylesheet" href="css/base.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .others-wrapper {
+      position: relative;
+      z-index: 1;
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 24px 16px 60px;
+    }
+
+    .page-title {
+      text-align: center;
+      font-family: var(--font-pixel);
+      font-size: 1rem;
+      color: var(--color-accent);
+      margin-bottom: 8px;
+    }
+
+    .page-sub {
+      text-align: center;
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.4);
+      margin-bottom: 28px;
+    }
+
+    /* ── 統計バー ─��� */
+    .week-summary {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .week-stat {
+      text-align: center;
+    }
+
+    .week-stat .stat-val {
+      font-family: var(--font-pixel);
+      font-size: 1.3rem;
+      color: var(--color-accent);
+    }
+
+    .week-stat .stat-label {
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.4);
+      margin-top: 4px;
+    }
+
+    /* ── テーブル ── */
+    .others-table {
+      width: 100%;
+    }
+
+    .others-table th {
+      font-size: 0.7rem;
+      white-space: nowrap;
+    }
+
+    .others-table td {
+      font-size: 0.88rem;
+      vertical-align: middle;
+    }
+
+    .others-table tr.is-me {
+      background: rgba(240,192,64,0.08);
+    }
+
+    .others-table tr.is-me td {
+      color: var(--color-accent);
+      font-weight: 700;
+    }
+
+    .others-table .rank-num {
+      font-family: var(--font-pixel);
+      font-size: 0.75rem;
+      color: var(--color-accent);
+      text-align: center;
+      width: 36px;
+    }
+
+    .others-table .score-cell {
+      font-family: var(--font-pixel);
+      font-size: 0.8rem;
+    }
+
+    .others-table .time-cell {
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.5);
+    }
+
+    .empty-msg {
+      text-align: center;
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.4);
+      padding: 40px 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="others-wrapper">
+    <h1 class="page-title">今週のみんなの成績</h1>
+    <div class="page-sub" id="weekLabel"></div>
+
+    <!-- 統計サマリー -->
+    <div class="week-summary" id="weekSummary"></div>
+
+    <!-- 一覧テーブル -->
+    <table class="others-table" id="othersTable">
+      <thead>
+        <tr>
+          <th style="text-align:center">#</th>
+          <th>ゲスト名</th>
+          <th>スコア</th>
+          <th>所要時間</th>
+        </tr>
+      </thead>
+      <tbody id="othersBody"></tbody>
+    </table>
+    <div class="empty-msg hidden" id="emptyMsg">今週はまだ誰も受験して��ません。</div>
+
+    <div style="text-align:center; margin-top:32px;">
+      <a href="home.html" class="btn btn--accent">ホームに戻る</a>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    (async function init() {
+      const user = await requireAuth();
+      if (!user) return;
+
+      // 最新の公開クイズを��得
+      const { data: latestQuiz } = await _supabase
+        .from('quiz_sets')
+        .select('id, week_id')
+        .eq('is_published', true)
+        .order('week_start', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!latestQuiz) {
+        document.getElementById('emptyMsg').classList.remove('hidden');
+        document.getElementById('othersTable').classList.add('hidden');
+        return;
+      }
+
+      document.getElementById('weekLabel').textContent = latestQuiz.week_id;
+
+      // 全ユーザーの今週スコアを取得（スコア降順）
+      const { data: scores } = await _supabase
+        .from('weekly_scores')
+        .select('total_score, time_taken, user_id, users(guest_name)')
+        .eq('quiz_id', latestQuiz.id)
+        .order('total_score', { ascending: false })
+        .order('time_taken', { ascending: true });
+
+      if (!scores || scores.length === 0) {
+        document.getElementById('emptyMsg').classList.remove('hidden');
+        document.getElementById('othersTable').classList.add('hidden');
+        return;
+      }
+
+      // 統計サマリー
+      const totalP = scores.length;
+      const avgScore = (scores.reduce((s, r) => s + r.total_score, 0) / totalP).toFixed(1);
+      const maxScore = Math.max(...scores.map(s => s.total_score));
+      document.getElementById('weekSummary').innerHTML = `
+        <div class="week-stat"><div class="stat-val">${totalP}</div><div class="stat-label">受験者数</div></div>
+        <div class="week-stat"><div class="stat-val">${avgScore}</div><div class="stat-label">平均スコア</div></div>
+        <div class="week-stat"><div class="stat-val">${maxScore}/10</div><div class="stat-label">��高スコア</div></div>
+      `;
+
+      // テーブル描画
+      const tbody = document.getElementById('othersBody');
+      scores.forEach((s, i) => {
+        const name = s.users?.guest_name || '不明';
+        const isMe = s.user_id === user.id;
+        const time = s.time_taken != null
+          ? `${Math.floor(s.time_taken / 60)}:${String(s.time_taken % 60).padStart(2, '0')}`
+          : '-';
+
+        const tr = document.createElement('tr');
+        if (isMe) tr.classList.add('is-me');
+        tr.innerHTML = `
+          <td class="rank-num">${i + 1}</td>
+          <td>${name}${isMe ? ' (あなた)' : ''}</td>
+          <td class="score-cell">${s.total_score}/10</td>
+          <td class="time-cell">${time}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    })();
+  </script>
+</body>
+</html>

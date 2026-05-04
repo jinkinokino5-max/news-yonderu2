@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ホーム | ニュース読んでる？</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/rank-backgrounds.css">
+  <link rel="stylesheet" href="css/home.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <!-- 背景装飾レイヤー（章別CSS用） -->
+  <div class="rank-corners" id="rankCorners"></div>
+  <!-- 第5章のみ表示される境界線 -->
+  <div class="rank-border-line top"></div>
+  <div class="rank-border-line bottom"></div>
+  <div class="rank-border-line left"></div>
+  <div class="rank-border-line right"></div>
+
+  <!-- ユーザー情報バー -->
+  <div class="user-bar">
+    <span class="user-name" id="userNameDisplay"></span>
+    <button class="logout-btn" onclick="signOut()">ログアウト</button>
+  </div>
+
+  <!-- 管理者リンク（admin のみ表示） -->
+  <a href="admin/index.html" class="admin-link hidden" id="adminLink">管理者</a>
+
+  <div class="home-wrapper">
+    <!-- 新クイズ公開バナー -->
+    <div class="new-quiz-banner hidden" id="newQuizBanner">
+      <div class="banner-dot"></div>
+      今週のクイズが公開されました！
+      <a href="quiz.html" style="color:inherit; text-decoration:underline; margin-left:auto;">挑戦する →</a>
+    </div>
+
+    <!-- ランク表示 -->
+    <div class="rank-header">
+      <div class="rank-title" id="rankName">読み込み中...</div>
+      <div class="rank-chapter" id="rankChapter"></div>
+      <div class="rank-score-line" id="rankScoreLine"></div>
+    </div>
+
+    <!-- CSSドット絵アバター -->
+    <div class="avatar-area">
+      <div class="avatar" id="avatarEl">
+        <div class="head"></div>
+        <div class="body"></div>
+      </div>
+      <div class="avatar-pedestal"></div>
+    </div>
+
+    <!-- 4ボタングリッド -->
+    <div class="home-grid">
+      <!-- 最新クイズ -->
+      <a href="quiz.html" class="home-grid-btn btn-quiz" id="quizBtn">
+        <span class="btn-icon">📰</span>
+        <span class="btn-label">今週の<br>クイズに挑戦</span>
+      </a>
+      <!-- あなたの成績 -->
+      <a href="my-stats.html" class="home-grid-btn">
+        <span class="btn-icon">📊</span>
+        <span class="btn-label">あなたの<br>成績</span>
+      </a>
+      <!-- 他人の成績 -->
+      <a href="others-stats.html" class="home-grid-btn">
+        <span class="btn-icon">👥</span>
+        <span class="btn-label">今週の<br>みんなの成績</span>
+      </a>
+      <!-- ランキング -->
+      <a href="ranking.html" class="home-grid-btn">
+        <span class="btn-icon">🏆</span>
+        <span class="btn-label">ランキング</span>
+      </a>
+    </div>
+
+    <!-- ランクプログレスバー -->
+    <div class="rank-progress" id="rankProgressArea">
+      <div class="rank-progress-label">
+        <span id="currentRankLabel">現在のランク</span>
+        <span id="nextRankLabel">次のランク</span>
+      </div>
+      <div class="rank-progress-bar">
+        <div class="rank-progress-fill" id="rankProgressFill" style="width: 0%"></div>
+      </div>
+      <div style="text-align:center; margin-top:8px; font-size:0.7rem; color:rgba(255,255,255,0.35);" id="rankProgressText"></div>
+    </div>
+
+    <!-- アーカイブリンク -->
+    <div style="margin-top:32px;">
+      <a href="archive.html" style="font-size:0.8rem; color:rgba(255,255,255,0.3); text-decoration:underline;">過去問アーカイブ</a>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/rank-system.js"></script>
+  <script>
+    const CHAPTER_NAMES = ['', '第1章 学び舎', '第2章 霞が関', '第3章 権力の回廊', '第4章 国会議事堂', '第5章 総理官邸'];
+
+    (async function init() {
+      const user = await requireAuth();
+      if (!user) return;
+
+      // ユーザー名表示
+      document.getElementById('userNameDisplay').textContent = user.guest_name;
+
+      // 管理者リンク表示
+      if (user.role === 'admin') {
+        document.getElementById('adminLink').classList.remove('hidden');
+      }
+
+      // ランク情報適用
+      const rank = getRankById(user.rank_id || 1);
+      applyRankToPage(rank, user);
+
+      // 新クイズ・受験済みチェック
+      await checkLatestQuiz(user);
+    })();
+
+    function applyRankToPage(rank, user) {
+      // 役職名・章名
+      document.getElementById('rankName').textContent = rank.name;
+      document.getElementById('rankChapter').textContent = CHAPTER_NAMES[rank.chapter] || '';
+
+      // ランクスコア表示
+      const score = user.rank_score || 0;
+      document.getElementById('rankScoreLine').textContent = `ランクスコア：${Math.floor(score)}`;
+
+      // body にランク・章クラスを付与
+      document.body.classList.add(`chapter-${rank.chapter}`, `rank-${rank.id}`);
+
+      // プログレスバー
+      const nextRank = getRankById(rank.id + 1);
+      if (nextRank && nextRank.id !== rank.id) {
+        const currentMin = rank.min;
+        const nextMin = nextRank.min;
+        const progress = Math.min(100, Math.max(0, ((score - currentMin) / (nextMin - currentMin)) * 100));
+        document.getElementById('rankProgressFill').style.width = progress.toFixed(1) + '%';
+        document.getElementById('currentRankLabel').textContent = rank.name;
+        document.getElementById('nextRankLabel').textContent = nextRank.name;
+        document.getElementById('rankProgressText').textContent =
+          `あと ${Math.max(0, Math.floor(nextMin - score))} ポイントで昇格`;
+      } else {
+        // 最高ランク
+        document.getElementById('rankProgressFill').style.width = '100%';
+        document.getElementById('currentRankLabel').textContent = rank.name;
+        document.getElementById('nextRankLabel').textContent = '最高位';
+        document.getElementById('rankProgressText').textContent = '最高位に到達しました！';
+      }
+    }
+
+    async function checkLatestQuiz(user) {
+      // 最新の公開済みクイズを取得
+      const { data: latestQuiz } = await _supabase
+        .from('quiz_sets')
+        .select('id, week_id')
+        .eq('is_published', true)
+        .order('week_start', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!latestQuiz) {
+        document.getElementById('quizBtn').classList.add('done');
+        document.getElementById('quizBtn').querySelector('.btn-label').textContent = 'クイズ準備中';
+        return;
+      }
+
+      // 受験済みチェック
+      const { data: score } = await _supabase
+        .from('weekly_scores')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('quiz_id', latestQuiz.id)
+        .maybeSingle();
+
+      const quizBtn = document.getElementById('quizBtn');
+      if (score) {
+        quizBtn.classList.add('done');
+        quizBtn.innerHTML = `
+          <span class="done-badge">受験済み</span>
+          <span class="btn-icon">✅</span>
+          <span class="btn-label">今週は<br>受験済みです</span>
+        `;
+        quizBtn.removeAttribute('href');
+      } else {
+        // 未受験なら新クイズバナーを表示
+        document.getElementById('newQuizBanner').classList.remove('hidden');
+        // セッションストレージにクイズIDを保存
+        sessionStorage.setItem('currentQuizId', latestQuiz.id);
+        sessionStorage.setItem('currentWeekId', latestQuiz.week_id);
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>結果 | ニュース読んでる？</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/effects.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .result-wrapper {
+      position: relative;
+      z-index: 1;
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 24px 16px 60px;
+    }
+
+    .result-page-title {
+      text-align: center;
+      font-family: var(--font-pixel);
+      font-size: 1.2rem;
+      color: var(--color-accent);
+      margin-bottom: 28px;
+      text-shadow: 0 0 12px rgba(240, 192, 64, 0.3);
+    }
+
+    /* ── スコア表示 ── */
+    .result-score-section {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .result-score-circle {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 160px;
+      height: 160px;
+      border-radius: 50%;
+      border: 3px solid var(--color-accent);
+      background: rgba(240, 192, 64, 0.06);
+      margin-bottom: 12px;
+    }
+
+    .score-big {
+      font-family: var(--font-pixel);
+      font-size: 2.5rem;
+      color: var(--color-text);
+      line-height: 1.2;
+    }
+
+    .score-slash {
+      font-size: 1rem;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .score-pct {
+      font-family: var(--font-pixel);
+      font-size: 0.8rem;
+      color: var(--color-accent);
+      margin-top: 4px;
+    }
+
+    .result-time {
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.45);
+    }
+
+    .result-comment {
+      text-align: center;
+      font-size: 1rem;
+      color: rgba(255, 255, 255, 0.75);
+      margin-top: 12px;
+      margin-bottom: 28px;
+    }
+
+    .result-rank-info {
+      text-align: center;
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.45);
+      margin-bottom: 32px;
+    }
+
+    .result-rank-info strong {
+      color: var(--color-accent);
+    }
+
+    /* ── カテゴリ別正答率 ── */
+    .category-section {
+      margin-bottom: 36px;
+    }
+
+    .section-title {
+      font-family: var(--font-pixel);
+      font-size: 0.8rem;
+      color: var(--color-accent);
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .cat-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .cat-label {
+      font-size: 0.85rem;
+      font-weight: 700;
+      width: 40px;
+      flex-shrink: 0;
+      text-align: right;
+    }
+
+    .cat-bar-track {
+      flex: 1;
+      height: 20px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .cat-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      width: 0;
+      transition: width 0.8s ease-out 0.3s;
+    }
+
+    .cat-score {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.6);
+      width: 36px;
+      flex-shrink: 0;
+    }
+
+    /* ── 全問解説 ── */
+    .explanations-section {
+      margin-bottom: 36px;
+    }
+
+    .explanation-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 18px 20px;
+      margin-bottom: 14px;
+    }
+
+    .explanation-card.explanation-correct {
+      border-left: 3px solid var(--color-correct);
+    }
+
+    .explanation-card.explanation-wrong {
+      border-left: 3px solid var(--color-wrong);
+    }
+
+    .explanation-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .explanation-num {
+      font-family: var(--font-pixel);
+      font-size: 0.75rem;
+      color: var(--color-accent);
+    }
+
+    .explanation-status {
+      margin-left: auto;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .explanation-question {
+      font-size: 0.95rem;
+      line-height: 1.8;
+      color: rgba(255, 255, 255, 0.9);
+      margin-bottom: 12px;
+    }
+
+    .explanation-choices {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .exp-choice {
+      font-size: 0.85rem;
+      line-height: 1.6;
+      padding: 6px 10px;
+      border-radius: 4px;
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .exp-choice-label {
+      font-family: var(--font-pixel);
+      font-size: 0.65rem;
+      color: rgba(255, 255, 255, 0.4);
+      margin-right: 4px;
+    }
+
+    .exp-choice-correct {
+      background: rgba(0, 255, 0, 0.08);
+      border: 1px solid rgba(0, 255, 0, 0.25);
+      color: rgba(255, 255, 255, 0.85);
+    }
+
+    .exp-choice-correct .exp-choice-label {
+      color: var(--color-correct);
+    }
+
+    .exp-choice-wrong {
+      background: rgba(255, 0, 0, 0.06);
+      border: 1px solid rgba(255, 0, 0, 0.2);
+    }
+
+    .exp-choice-wrong .exp-choice-label {
+      color: var(--color-wrong);
+    }
+
+    .explanation-answer {
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.5);
+      margin-bottom: 10px;
+    }
+
+    .explanation-body {
+      font-size: 0.88rem;
+      line-height: 1.8;
+      color: rgba(255, 255, 255, 0.75);
+      background: rgba(255, 255, 255, 0.03);
+      padding: 12px 14px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+
+    .explanation-debate {
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.55);
+      padding: 8px 12px;
+      background: rgba(240, 192, 64, 0.05);
+      border-left: 2px solid var(--color-accent);
+      border-radius: 0 4px 4px 0;
+    }
+
+    .explanation-debate strong {
+      color: var(--color-accent);
+    }
+
+    /* ── ナビゲーションボタン ── */
+    .result-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items: center;
+      margin-top: 24px;
+    }
+
+    .result-nav .btn {
+      width: 100%;
+      max-width: 320px;
+    }
+
+    /* ── レスポンシブ ── */
+    @media (max-width: 600px) {
+      .result-score-circle {
+        width: 130px;
+        height: 130px;
+      }
+      .score-big { font-size: 2rem; }
+      .explanation-card { padding: 14px 14px; }
+      .explanation-question { font-size: 0.9rem; }
+      .exp-choice { font-size: 0.8rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="result-wrapper">
+    <h1 class="result-page-title">RESULT</h1>
+
+    <!-- スコア -->
+    <div class="result-score-section" id="scoreSummary">
+      <div class="loading">読み込み中...</div>
+    </div>
+
+    <!-- コメント -->
+    <div class="result-comment" id="scoreComment"></div>
+
+    <!-- ランク情報 -->
+    <div class="result-rank-info" id="rankInfo"></div>
+
+    <!-- カテゴリ別正答率 -->
+    <div class="category-section">
+      <h2 class="section-title">カテゴリ別正答率</h2>
+      <div id="categoryBars"></div>
+    </div>
+
+    <!-- 全問解説 -->
+    <div class="explanations-section">
+      <h2 class="section-title">全問解説</h2>
+      <div id="explanationsList"></div>
+    </div>
+
+    <!-- ナビゲーション -->
+    <div class="result-nav">
+      <a href="my-stats.html" class="btn">あなたの成績を見る</a>
+      <a href="others-stats.html" class="btn">みんなの成績を見る</a>
+      <a href="home.html" class="btn btn--accent">ホームに戻る</a>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/rank-system.js"></script>
+  <script src="js/results.js"></script>
+  <script>
+    (async function init() {
+      const user = await requireAuth();
+      if (!user) return;
+
+      const result = getQuizResult();
+      if (!result) {
+        window.location.href = 'home.html';
+        return;
+      }
+
+      // ランクアップ演出（先に表示）
+      if (result.didRankUp && result.newRank) {
+        await showRankUpEffect(result.newRank);
+      }
+
+      // スコア表示
+      renderScoreSummary(result, document.getElementById('scoreSummary'));
+
+      // コメント
+      document.getElementById('scoreComment').textContent = getScoreComment(result.score, result.total);
+
+      // ランク情報
+      const rankInfo = document.getElementById('rankInfo');
+      if (result.newRank) {
+        rankInfo.innerHTML = `現在の役職：<strong>${result.newRank.name}</strong>　ランクスコア：<strong>${result.rankScore}</strong>`;
+      }
+
+      // カテゴリ別
+      renderCategoryBars(result, document.getElementById('categoryBars'));
+
+      // 全問解説
+      renderAllExplanations(result, document.getElementById('explanationsList'));
+
+      // セッションデータは残す（my-stats等で参照する可能性があるため）
+    })();
+  </script>
+</body>
+</html>

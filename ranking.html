@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ランキング | ニュース読んでる？</title>
+  <link rel="stylesheet" href="css/base.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .ranking-wrapper {
+      position: relative;
+      z-index: 1;
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 24px 16px 60px;
+    }
+
+    .page-title {
+      text-align: center;
+      font-family: var(--font-pixel);
+      font-size: 1rem;
+      color: var(--color-accent);
+      margin-bottom: 28px;
+    }
+
+    /* ── トップ3 ── */
+    .top3 {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    .top3-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: 16px 14px 14px;
+      width: 120px;
+      text-align: center;
+      position: relative;
+    }
+
+    .top3-card.first {
+      border-color: rgba(240,192,64,0.6);
+      background: rgba(240,192,64,0.06);
+      padding-bottom: 18px;
+      transform: translateY(-8px);
+    }
+
+    .top3-card.second {
+      border-color: rgba(192,192,192,0.4);
+    }
+
+    .top3-card.third {
+      border-color: rgba(180,120,60,0.4);
+    }
+
+    .top3-medal {
+      font-size: 1.6rem;
+      margin-bottom: 6px;
+    }
+
+    .top3-name {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--color-text);
+      word-break: break-all;
+      margin-bottom: 4px;
+    }
+
+    .top3-rank-title {
+      font-size: 0.6rem;
+      color: rgba(255,255,255,0.4);
+      margin-bottom: 4px;
+    }
+
+    .top3-score {
+      font-family: var(--font-pixel);
+      font-size: 0.7rem;
+      color: var(--color-accent);
+    }
+
+    /* ── テーブ�� ── */
+    .ranking-table {
+      width: 100%;
+    }
+
+    .ranking-table th {
+      font-size: 0.7rem;
+      white-space: nowrap;
+    }
+
+    .ranking-table td {
+      font-size: 0.88rem;
+      vertical-align: middle;
+    }
+
+    .ranking-table tr.is-me {
+      background: rgba(240,192,64,0.08);
+    }
+
+    .ranking-table tr.is-me td {
+      color: var(--color-accent);
+      font-weight: 700;
+    }
+
+    .ranking-table .rank-num {
+      font-family: var(--font-pixel);
+      font-size: 0.75rem;
+      color: var(--color-accent);
+      text-align: center;
+      width: 36px;
+    }
+
+    .ranking-table .rank-title-cell {
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.5);
+    }
+
+    .ranking-table .score-cell {
+      font-family: var(--font-pixel);
+      font-size: 0.75rem;
+      color: var(--color-accent);
+    }
+
+    .empty-msg {
+      text-align: center;
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.4);
+      padding: 40px 16px;
+    }
+
+    @media (max-width: 480px) {
+      .top3-card { width: 95px; padding: 12px 8px 10px; }
+      .top3-name { font-size: 0.7rem; }
+      .top3-medal { font-size: 1.3rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="ranking-wrapper">
+    <h1 class="page-title">RANKING</h1>
+
+    <!-- トップ3 -->
+    <div class="top3 hidden" id="top3"></div>
+
+    <!-- 全体テーブル -->
+    <table class="ranking-table" id="rankingTable">
+      <thead>
+        <tr>
+          <th style="text-align:center">#</th>
+          <th>ゲスト名</th>
+          <th>役職</th>
+          <th>スコア</th>
+        </tr>
+      </thead>
+      <tbody id="rankingBody"></tbody>
+    </table>
+    <div class="empty-msg hidden" id="emptyMsg">まだランキングデータ��ありません。</div>
+
+    <div style="text-align:center; margin-top:32px;">
+      <a href="home.html" class="btn btn--accent">ホームに戻る</a>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    (async function init() {
+      const user = await requireAuth();
+      if (!user) return;
+
+      // 全ユーザーをrank_score降順で取得
+      const { data: users } = await _supabase
+        .from('users')
+        .select('id, guest_name, rank_id, rank_score')
+        .eq('is_banned', false)
+        .order('rank_score', { ascending: false });
+
+      if (!users || users.length === 0) {
+        document.getElementById('emptyMsg').classList.remove('hidden');
+        document.getElementById('rankingTable').classList.add('hidden');
+        return;
+      }
+
+      // トップ3表示
+      if (users.length >= 1) {
+        const medals = ['🥇', '��', '🥉'];
+        const classes = ['first', 'second', 'third'];
+        const top3El = document.getElementById('top3');
+        // 2位・1位・3位の順で並べる（中央が1位）
+        const order = users.length >= 3 ? [1, 0, 2] : users.length === 2 ? [1, 0] : [0];
+
+        order.forEach(idx => {
+          if (!users[idx]) return;
+          const u = users[idx];
+          const rank = getRankById(u.rank_id || 1);
+          const card = document.createElement('div');
+          card.className = `top3-card ${classes[idx] || ''}`;
+          card.innerHTML = `
+            <div class="top3-medal">${medals[idx] || ''}</div>
+            <div class="top3-name">${u.guest_name}</div>
+            <div class="top3-rank-title">${rank.name}</div>
+            <div class="top3-score">${Math.floor(u.rank_score || 0)} pt</div>
+          `;
+          top3El.appendChild(card);
+        });
+        top3El.classList.remove('hidden');
+      }
+
+      // テ���ブル描画
+      const tbody = document.getElementById('rankingBody');
+      users.forEach((u, i) => {
+        const rank = getRankById(u.rank_id || 1);
+        const isMe = u.id === user.id;
+        const tr = document.createElement('tr');
+        if (isMe) tr.classList.add('is-me');
+        tr.innerHTML = `
+          <td class="rank-num">${i + 1}</td>
+          <td>${u.guest_name}${isMe ? ' (あなた)' : ''}</td>
+          <td class="rank-title-cell">${rank.name}</td>
+          <td class="score-cell">${Math.floor(u.rank_score || 0)} pt</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    })();
+  </script>
+</body>
+</html>
