@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>クイズ編集 | ニュース読んでる？</title>
+  <link rel="stylesheet" href="../css/base.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .admin-wrapper {
+      position: relative; z-index: 1;
+      max-width: 900px; margin: 0 auto; padding: 24px 16px 60px;
+    }
+    .admin-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
+    }
+    .admin-title { font-family: var(--font-pixel); font-size: 1rem; color: var(--color-accent); }
+    .admin-back { font-size: 0.8rem; color: rgba(255,255,255,0.4); }
+
+    /* ── クイズセット一覧 ── */
+    .quiz-list { margin-bottom: 28px; }
+
+    .qs-card {
+      background: var(--color-surface); border: 1px solid var(--color-border);
+      border-radius: 8px; margin-bottom: 10px; overflow: hidden;
+    }
+    .qs-card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; cursor: pointer; transition: background 0.2s;
+      flex-wrap: wrap; gap: 8px;
+    }
+    .qs-card-header:hover { background: rgba(240,192,64,0.04); }
+
+    .qs-title { font-family: var(--font-pixel); font-size: 0.8rem; color: var(--color-accent); }
+    .qs-meta { font-size: 0.75rem; color: rgba(255,255,255,0.4); }
+
+    .qs-actions { display: flex; gap: 8px; align-items: center; }
+    .tag-pub { padding: 2px 8px; font-size: 0.65rem; font-weight: 700; border-radius: 3px; }
+    .tag-pub.yes { background: rgba(0,200,80,0.15); color: #66ff99; border: 1px solid rgba(0,200,80,0.3); }
+    .tag-pub.no  { background: rgba(255,150,0,0.15); color: #ffaa44; border: 1px solid rgba(255,150,0,0.3); }
+
+    .qs-btn {
+      padding: 4px 12px; font-size: 0.72rem; font-weight: 700; border: 1px solid;
+      border-radius: 3px; cursor: pointer; transition: all 0.2s; background: transparent;
+    }
+    .qs-btn.publish   { color: #66ff99; border-color: rgba(0,200,80,0.4); }
+    .qs-btn.unpublish { color: #ffaa44; border-color: rgba(255,150,0,0.4); }
+    .qs-btn.delete    { color: #ff6666; border-color: rgba(255,60,60,0.4); }
+    .qs-btn:hover { opacity: 0.7; }
+
+    .qs-card-body { display: none; padding: 0 18px 18px; }
+    .qs-card.open .qs-card-body { display: block; }
+    .qs-card .toggle-icon { transition: transform 0.2s; font-size: 0.8rem; color: rgba(255,255,255,0.3); }
+    .qs-card.open .toggle-icon { transform: rotate(180deg); }
+
+    /* ── 問題編集カード ── */
+    .q-edit-card {
+      background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 6px; padding: 14px 16px; margin-bottom: 10px;
+    }
+    .q-edit-header {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;
+    }
+    .q-edit-num { font-family: var(--font-pixel); font-size: 0.7rem; color: var(--color-accent); }
+
+    .q-field { margin-bottom: 10px; }
+    .q-field label {
+      display: block; font-size: 0.72rem; color: rgba(255,255,255,0.45);
+      margin-bottom: 4px; font-weight: 700;
+    }
+    .q-field input, .q-field textarea, .q-field select {
+      width: 100%; font-size: 0.88rem;
+    }
+    .q-field textarea { min-height: 60px; resize: vertical; }
+
+    .q-choices-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    }
+
+    .q-save-btn {
+      padding: 6px 16px; font-size: 0.75rem; font-weight: 700;
+      color: var(--color-base); background: var(--color-accent);
+      border: none; border-radius: 3px; cursor: pointer;
+      transition: background 0.2s;
+    }
+    .q-save-btn:hover { background: #e0b030; }
+
+    .q-save-status {
+      font-size: 0.72rem; margin-left: 8px;
+    }
+    .q-save-status.ok   { color: var(--color-correct); }
+    .q-save-status.fail { color: var(--color-wrong); }
+
+    .empty-msg {
+      text-align: center; font-size: 0.85rem;
+      color: rgba(255,255,255,0.4); padding: 40px 16px;
+    }
+
+    @media (max-width: 600px) {
+      .q-choices-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-wrapper">
+    <div class="admin-header">
+      <h1 class="admin-title">クイズ編集・公開</h1>
+      <a href="index.html" class="admin-back">← ダッシュボード</a>
+    </div>
+
+    <div class="quiz-list" id="quizList">
+      <div class="loading">読み込み中...</div>
+    </div>
+    <div class="empty-msg hidden" id="emptyMsg">クイズセットがありません。</div>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/admin.js"></script>
+  <script>
+    const categoryLabel = { politics: '政治', economy: '経済', international: '国際' };
+    const diffLabel = { easy: '易', medium: '中', hard: '難' };
+
+    (async function init() {
+      const user = await requireAdmin();
+      if (!user) return;
+
+      const sets = await loadQuizSets();
+      const list = document.getElementById('quizList');
+      list.innerHTML = '';
+
+      if (sets.length === 0) {
+        document.getElementById('emptyMsg').classList.remove('hidden');
+        return;
+      }
+
+      sets.forEach(qs => {
+        const card = document.createElement('div');
+        card.className = 'qs-card';
+        card.id = `qs-${qs.id}`;
+
+        const pubTag = qs.is_published
+          ? '<span class="tag-pub yes">公開中</span>'
+          : '<span class="tag-pub no">未公開</span>';
+
+        const pubBtn = qs.is_published
+          ? `<button class="qs-btn unpublish" onclick="handlePublish('${qs.id}',false,event)">非公開にする</button>`
+          : `<button class="qs-btn publish" onclick="handlePublish('${qs.id}',true,event)">公開する</button>`;
+
+        card.innerHTML = `
+          <div class="qs-card-header" onclick="toggleCard('${qs.id}')">
+            <div>
+              <div class="qs-title">${qs.week_id}</div>
+              <div class="qs-meta">${qs.week_start} ～ ${qs.week_end}</div>
+            </div>
+            <div class="qs-actions">
+              ${pubTag}
+              ${pubBtn}
+              <button class="qs-btn delete" onclick="handleDelete('${qs.id}',event)">削除</button>
+              <span class="toggle-icon">▼</span>
+            </div>
+          </div>
+          <div class="qs-card-body" id="body-${qs.id}" data-loaded="false"></div>
+        `;
+        list.appendChild(card);
+      });
+    })();
+
+    async function toggleCard(quizId) {
+      const card = document.getElementById(`qs-${quizId}`);
+      const body = document.getElementById(`body-${quizId}`);
+      const isOpen = card.classList.contains('open');
+
+      if (isOpen) { card.classList.remove('open'); return; }
+      card.classList.add('open');
+
+      if (body.dataset.loaded === 'true') return;
+      body.innerHTML = '<div class="loading" style="min-height:40px">読み込み中...</div>';
+
+      const questions = await loadQuestions(quizId);
+      if (questions.length === 0) {
+        body.innerHTML = '<div style="padding:12px;font-size:0.85rem;color:rgba(255,255,255,0.4)">問題がありません。</div>';
+        body.dataset.loaded = 'true';
+        return;
+      }
+
+      body.innerHTML = questions.map(q => buildQuestionEditor(q)).join('');
+      body.dataset.loaded = 'true';
+    }
+
+    function buildQuestionEditor(q) {
+      return `
+        <div class="q-edit-card" id="qedit-${q.id}">
+          <div class="q-edit-header">
+            <span class="q-edit-num">Q${q.order_num}</span>
+            <span class="badge badge--${q.category}">${categoryLabel[q.category]}</span>
+            <span class="badge badge--${q.difficulty}">${diffLabel[q.difficulty]}</span>
+          </div>
+
+          <div class="q-field">
+            <label>問題文</label>
+            <textarea id="qt-${q.id}">${q.question_text}</textarea>
+          </div>
+
+          <div class="q-choices-grid">
+            <div class="q-field"><label>選択���A</label><input type="text" id="ca-${q.id}" value="${escHtml(q.choice_a)}"></div>
+            <div class="q-field"><label>選択肢B</label><input type="text" id="cb-${q.id}" value="${escHtml(q.choice_b)}"></div>
+            <div class="q-field"><label>選択肢C</label><input type="text" id="cc-${q.id}" value="${escHtml(q.choice_c)}"></div>
+            <div class="q-field"><label>選択肢D</label><input type="text" id="cd-${q.id}" value="${escHtml(q.choice_d)}"></div>
+          </div>
+
+          <div class="q-field">
+            <label>正解</label>
+            <select id="ans-${q.id}">
+              <option value="A" ${q.correct_answer==='A'?'selected':''}>A</option>
+              <option value="B" ${q.correct_answer==='B'?'selected':''}>B</option>
+              <option value="C" ${q.correct_answer==='C'?'selected':''}>C</option>
+              <option value="D" ${q.correct_answer==='D'?'selected':''}>D</option>
+            </select>
+          </div>
+
+          <div class="q-field">
+            <label>解説</label>
+            <textarea id="exp-${q.id}">${q.explanation || ''}</textarea>
+          </div>
+
+          <div class="q-field">
+            <label>関連論題</label>
+            <input type="text" id="deb-${q.id}" value="${escHtml(q.debate_topic || '')}">
+          </div>
+
+          <button class="q-save-btn" onclick="saveQuestion('${q.id}')">保存</button>
+          <span class="q-save-status" id="status-${q.id}"></span>
+        </div>
+      `;
+    }
+
+    function escHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    async function saveQuestion(qId) {
+      const statusEl = document.getElementById(`status-${qId}`);
+      statusEl.textContent = '保存中...';
+      statusEl.className = 'q-save-status';
+
+      const updates = {
+        question_text: document.getElementById(`qt-${qId}`).value,
+        choice_a: document.getElementById(`ca-${qId}`).value,
+        choice_b: document.getElementById(`cb-${qId}`).value,
+        choice_c: document.getElementById(`cc-${qId}`).value,
+        choice_d: document.getElementById(`cd-${qId}`).value,
+        correct_answer: document.getElementById(`ans-${qId}`).value,
+        explanation: document.getElementById(`exp-${qId}`).value,
+        debate_topic: document.getElementById(`deb-${qId}`).value,
+      };
+
+      const ok = await updateQuestion(qId, updates);
+      if (ok) {
+        statusEl.textContent = '保存しました';
+        statusEl.className = 'q-save-status ok';
+      } else {
+        statusEl.textContent = '保存に失敗しました';
+        statusEl.className = 'q-save-status fail';
+      }
+      setTimeout(() => { statusEl.textContent = ''; }, 3000);
+    }
+
+    async function handlePublish(quizId, publish, e) {
+      e.stopPropagation();
+      const action = publish ? '公開' : '非公開に';
+      if (!confirm(`このクイズを${action}しますか？`)) return;
+
+      const ok = await togglePublish(quizId, publish);
+      if (ok) location.reload();
+      else alert('操作に失敗しました。');
+    }
+
+    async function handleDelete(quizId, e) {
+      e.stopPropagation();
+      if (!confirm('このクイズセットを削除しますか？\n関連する問題も全て削除されます。')) return;
+
+      const ok = await deleteQuizSet(quizId);
+      if (ok) {
+        document.getElementById(`qs-${quizId}`).remove();
+      } else {
+        alert('削除に失敗しました。');
+      }
+    }
+  </script>
+</body>
+</html>

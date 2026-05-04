@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ユーザー管理 | ニュース読んでる？</title>
+  <link rel="stylesheet" href="../css/base.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .admin-wrapper {
+      position: relative; z-index: 1;
+      max-width: 900px; margin: 0 auto; padding: 24px 16px 60px;
+    }
+    .admin-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
+    }
+    .admin-title { font-family: var(--font-pixel); font-size: 1rem; color: var(--color-accent); }
+    .admin-back { font-size: 0.8rem; color: rgba(255,255,255,0.4); }
+
+    .user-count {
+      font-size: 0.8rem; color: rgba(255,255,255,0.4); margin-bottom: 16px;
+    }
+
+    /* ── テーブル ── */
+    .users-table { width: 100%; }
+    .users-table th { font-size: 0.68rem; white-space: nowrap; }
+    .users-table td { font-size: 0.85rem; vertical-align: middle; }
+
+    .users-table .name-cell { font-weight: 700; }
+    .users-table .role-cell {
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    }
+    .users-table .role-cell.admin { color: var(--color-accent); }
+    .users-table .role-cell.user  { color: rgba(255,255,255,0.4); }
+
+    .tag-banned {
+      display: inline-block; padding: 2px 6px; font-size: 0.62rem;
+      font-weight: 700; border-radius: 3px;
+      background: rgba(255,60,60,0.15); color: #ff6666;
+      border: 1px solid rgba(255,60,60,0.3);
+    }
+
+    .act-btn {
+      padding: 3px 10px; font-size: 0.68rem; font-weight: 700;
+      border: 1px solid; border-radius: 3px; cursor: pointer;
+      transition: all 0.2s; background: transparent;
+    }
+    .act-btn.ban   { color: #ffaa44; border-color: rgba(255,150,0,0.4); }
+    .act-btn.unban { color: #66ff99; border-color: rgba(0,200,80,0.4); }
+    .act-btn.del   { color: #ff6666; border-color: rgba(255,60,60,0.4); }
+    .act-btn:hover { opacity: 0.7; }
+
+    .actions-cell {
+      display: flex; gap: 6px; flex-wrap: wrap;
+    }
+
+    .empty-msg {
+      text-align: center; font-size: 0.85rem;
+      color: rgba(255,255,255,0.4); padding: 40px 16px;
+    }
+
+    @media (max-width: 600px) {
+      .users-table th, .users-table td { padding: 8px 6px; font-size: 0.78rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-wrapper">
+    <div class="admin-header">
+      <h1 class="admin-title">ユーザー管理</h1>
+      <a href="index.html" class="admin-back">← ダッシュボード</a>
+    </div>
+
+    <div class="user-count" id="userCount"></div>
+
+    <table class="users-table" id="usersTable">
+      <thead>
+        <tr>
+          <th>ゲスト名</th>
+          <th>ロール</th>
+          <th>ランク</th>
+          <th>参加数</th>
+          <th>スコア</th>
+          <th>状態</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="usersBody"></tbody>
+    </table>
+    <div class="empty-msg hidden" id="emptyMsg">ユーザーが見つかりません。</div>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/admin.js"></script>
+  <script>
+    let allUsers = [];
+
+    (async function init() {
+      const user = await requireAdmin();
+      if (!user) return;
+
+      allUsers = await loadAllUsers();
+      document.getElementById('userCount').textContent = `全 ${allUsers.length} ユーザー`;
+
+      if (allUsers.length === 0) {
+        document.getElementById('emptyMsg').classList.remove('hidden');
+        document.getElementById('usersTable').classList.add('hidden');
+        return;
+      }
+
+      renderUsers();
+    })();
+
+    function renderUsers() {
+      const tbody = document.getElementById('usersBody');
+      tbody.innerHTML = '';
+
+      allUsers.forEach(u => {
+        const rank = getRankById(u.rank_id || 1);
+        const roleClass = u.role === 'admin' ? 'admin' : 'user';
+        const bannedTag = u.is_banned ? '<span class="tag-banned">BAN</span>' : '';
+
+        const banBtn = u.is_banned
+          ? `<button class="act-btn unban" onclick="handleBan('${u.id}', false)">解除</button>`
+          : `<button class="act-btn ban" onclick="handleBan('${u.id}', true)">BAN</button>`;
+
+        const tr = document.createElement('tr');
+        tr.id = `user-${u.id}`;
+        tr.innerHTML = `
+          <td class="name-cell">${u.guest_name}</td>
+          <td class="role-cell ${roleClass}">${u.role}</td>
+          <td>${rank.name}</td>
+          <td>${u.total_participations || 0}</td>
+          <td>${Math.floor(u.rank_score || 0)}</td>
+          <td>${bannedTag || '-'}</td>
+          <td>
+            <div class="actions-cell">
+              ${banBtn}
+              <button class="act-btn del" onclick="handleDelete('${u.id}','${u.guest_name}')">削除</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function handleBan(userId, ban) {
+      const action = ban ? 'BANする' : 'BANを解除する';
+      if (!confirm(`このユーザーを${action}しますか？`)) return;
+
+      const ok = await toggleBan(userId, ban);
+      if (ok) {
+        const u = allUsers.find(x => x.id === userId);
+        if (u) u.is_banned = ban;
+        renderUsers();
+      } else {
+        alert('操作に失敗しました。');
+      }
+    }
+
+    async function handleDelete(userId, name) {
+      if (!confirm(`ユーザー「${name}」を削除しますか？\nこの操作は取り消せません。`)) return;
+
+      const ok = await deleteUser(userId);
+      if (ok) {
+        allUsers = allUsers.filter(u => u.id !== userId);
+        document.getElementById('userCount').textContent = `全 ${allUsers.length} ユーザー`;
+        renderUsers();
+      } else {
+        alert('削除に失敗しました。');
+      }
+    }
+  </script>
+</body>
+</html>
